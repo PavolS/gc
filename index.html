@@ -1,0 +1,51 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+  <title>GC</title>
+</head>
+
+<body>
+  <h1>Group chat</h1>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/realm-web@1.2.0/dist/bundle.iife.js"></script>
+
+  <script>
+// initialize the app
+const app = new Realm.App({ id: "app__group_chat-suslo" });
+
+// Create an anonymous credential
+const credentials = Realm.Credentials.anonymous();
+
+async function mongo_login() {
+    try {
+        // Authenticate the user
+        console.log('log in with', credentials)
+        const user = await app.logIn(credentials);
+        // `App.currentUser` updates to match the logged in user
+        console.assert(user.id === app.currentUser.id, 'Wanted %s, got %s', user.id, app.currentUser.id)
+        console.debug(user)
+        console.log('ok (user details in debug)')
+        return user
+    } catch(err) {
+         console.error("Failed to log in", err);
+    }
+}    
+
+async function show() {
+    
+    let user = await mongo_login() 
+    const mongodb = app.currentUser.mongoClient("mongodb-atlas");
+    const comments = mongodb.db("sample_mflix").collection("comments");
+    console.log(await comments.count())
+}
+
+
+show()      
+  </script>
+</body>
+</html>
