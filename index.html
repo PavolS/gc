@@ -11,12 +11,37 @@
 <body>
   <h1>Group chat</h1>
 
+  <div id="forVue">
+
+    <div id="counter">
+      Counter: {{ counter }}
+      N-Comments: {{ new_comments.length }}
+    </div>
+
+    <div id="list-rendering" v-if="new_comments.length">
+      <ol>
+        <li v-for="comment in new_comments"></li>
+          {{ comment?.text }}
+        </li>
+      </ol>
+    </div>
+
+    <div id="two-way-binding">
+      <p>{{ message }}</p>
+      <input @keyup.enter="publish" v-model="message" />
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/realm-web@1.2.0/dist/bundle.iife.js"></script>
+  <script src="https://unpkg.com/vue@next"></script>
 
   <script>
-// initialize the app
-const app = new Realm.App({ id: "app__group_chat-suslo" });
+
+// the core data holder for client app    
+
+// initialize the Mongo-realm app
+const mongo = new Realm.App({ id: "app__group_chat-suslo" });
 
 // Create an anonymous credential
 const credentials = Realm.Credentials.anonymous();
@@ -25,27 +50,84 @@ async function mongo_login() {
     try {
         // Authenticate the user
         console.log('log in with', credentials)
-        const user = await app.logIn(credentials);
+        const user = await mongo.logIn(credentials);
         // `App.currentUser` updates to match the logged in user
-        console.assert(user.id === app.currentUser.id, 'Wanted %s, got %s', user.id, app.currentUser.id)
+        console.assert(user.id === mongo.currentUser.id, 'Wanted %s, got %s', user.id, mongo.currentUser.id)
         console.debug(user)
-        console.log('ok (user details in debug)')
+        console.log('Logged in with id (more user details in debug):', user.id)
         return user
     } catch(err) {
          console.error("Failed to log in", err);
     }
-}    
+}   
 
-async function show() {
-    
-    let user = await mongo_login() 
-    const mongodb = app.currentUser.mongoClient("mongodb-atlas");
-    const comments = mongodb.db("sample_mflix").collection("comments");
-    console.log(await comments.count())
+async function comments_append_loop(comments, new_comments) {
+    for await (const change of comments.watch({
+      filter: {
+        operationType: "insert",
+        "fullDocument.type": "perennial",
+      },
+    })) {
+      // The change event will always represent a newly inserted comment
+      const { documentKey, fullDocument } = change;
+      console.log(`new document: ${documentKey}`, fullDocument);
+    }
 }
 
+async function get_first_and_last(collection) {
+  return collection.aggregate([{
+   $group: {
+      _id: null,
+      first: { $first: "$$ROOT" },
+      last: { $last: "$$ROOT" }
+   }
+  }]);
+}
 
-show()      
+async function main(new_comments) {
+    
+    let user = await mongo_login() 
+    const mongodb = mongo.currentUser.mongoClient("mongodb-atlas");
+    const comments = mongodb.db("sample_mflix").collection("comments");
+    console.log("Total comments:", await comments.count())
+
+    const fl = await get_first_and_last(comments)
+    console.log("fl: ", fl)
+    const last = fl[0].last
+    console.log("Push: ", last)
+    new_comments.push(last)
+
+    console.log("New comments: ", new_comments)
+
+    comments_append_loop(comments, new_comments)
+}
+
+const vueStuff = {
+  data() {
+    return {
+      counter: 0,
+      new_comments: [],
+      message: "Hi there!",
+      // comment: "this is lame  from Vue"
+    }
+  },
+  mounted() {
+    console.debug("Mounted, set timer...")
+    setInterval(() => { this.counter++ }, 1000)
+    console.debug("Connect with MongoDB Atlas Realm...")
+    main(this.new_comments)
+  },
+  methods: {
+    publish() {
+      console.log("SEND: ", this.message)
+      this.message = '<sending>'
+      message = ''
+    }
+  }
+}
+
+Vue.createApp(vueStuff).mount('#forVue')
+
   </script>
 </body>
 </html>
