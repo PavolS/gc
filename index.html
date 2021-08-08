@@ -23,7 +23,8 @@
 
       <p>Newest comments: </p>
 
-      <ol class="list-group list-group-numbered">
+      <div id="comments_div" class="overflow-auto" style="height: 180px;">
+       <ol class="list-group list-group-numbered">
         <li v-for="comment in new_comments" class="list-group-item d-flex justify-content-between align-items-start">
           <div class="ms-2 me-auto">
             <div class="fw-bold">{{ comment.name }}</div>          
@@ -31,7 +32,8 @@
           </div>
           <span class="text-muted small rounded-pill">{{ comment.date }}</span>
         </li>
-      </ol>
+       </ol>
+      </div>
 
   </div>
 
@@ -42,7 +44,6 @@
 
   <script>
 
-// the core data holder for client app    
 
 // initialize the Mongo-realm app
 const mongo = new Realm.App({ id: "app__group_chat-suslo" });
@@ -75,6 +76,12 @@ async function comments_append_loop(comments, new_comments) {
       const { documentKey, fullDocument } = change;
       console.debug(`new document: ${documentKey}`, fullDocument);
       new_comments.push(fullDocument)
+      Vue.nextTick(
+        function() {
+          var textarea = document.getElementById('comments_div');
+          textarea.scrollTop = textarea.scrollHeight;        
+        }
+      )
     }
 }
 
@@ -110,12 +117,16 @@ async function init(model) {
 }
 
 function pimp_message(model) {
-    if (!model.message.length) {
+    
+    if (model.message.length < 3) {
+      console.debug("pimping super short message messge...")
       model.message = "Hello everyone, this is an auto-gen message from " + 
                       model.name +
                       " who posted the last one at least " +
                       model.counter +
                       "s ago (if ever). Cheers!"
+    } else {
+      console.debug("there is ok message: ", model.message, model.message.length)
     }
 }
 
