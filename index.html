@@ -13,24 +13,18 @@
 
   <div id="forVue">
 
-    <div id="counter">
       Counter: {{ counter }}
-      N-Comments: {{ new_comments.length }}
-    </div>
 
-    <div id="list-rendering" v-if="new_comments.length">
+      <input @keyup.enter="publish" v-model="message" />
+
       <ol>
-        <li v-for="comment in new_comments"></li>
-          {{ comment?.text }}
+        <li v-for="comment in new_comments">
+          {{ comment.text }}
         </li>
       </ol>
-    </div>
 
-    <div id="two-way-binding">
-      <p>{{ message }}</p>
-      <input @keyup.enter="publish" v-model="message" />
-    </div>
   </div>
+
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/realm-web@1.2.0/dist/bundle.iife.js"></script>
