@@ -9,17 +9,27 @@
 </head>
 
 <body>
-  <h1>Group chat</h1>
+  <h1> Group chat</h1>
 
-  <div id="forVue">
+  <div id="forVue" class="container">
 
-      Counter: {{ counter }}
+      <p>
+        It has been at least <span class="badge bg-secondary text-break" style="width: 4rem;">{{ counter }}s</span> since you 
+        <input v-model="name" :disabled="!ready"/> 
+        posted a comment using this client/page.
+      </p>
 
-      <input @keyup.enter="publish" v-model="message" />
+      <textarea  @keyup.enter="publish" v-model="message" :disabled="!ready" class="mb-4 w-100"></textarea>
 
-      <ol>
-        <li v-for="comment in new_comments">
-          {{ comment.text }}
+      <p>Newest comments: </p>
+
+      <ol class="list-group list-group-numbered">
+        <li v-for="comment in new_comments" class="list-group-item d-flex justify-content-between align-items-start">
+          <div class="ms-2 me-auto">
+            <div class="fw-bold">{{ comment.name }}</div>          
+            {{ comment.text }}
+          </div>
+          <span class="text-muted small rounded-pill">{{ comment.date }}</span>
         </li>
       </ol>
 
@@ -48,7 +58,7 @@ async function mongo_login() {
         // `App.currentUser` updates to match the logged in user
         console.assert(user.id === mongo.currentUser.id, 'Wanted %s, got %s', user.id, mongo.currentUser.id)
         console.debug(user)
-        console.log('Logged in with id (more user details in debug):', user.id)
+        console.debug('Logged in with id (more user details in debug):', user.id)
         return user
     } catch(err) {
          console.error("Failed to log in", err);
@@ -59,12 +69,12 @@ async function comments_append_loop(comments, new_comments) {
     for await (const change of comments.watch({
       filter: {
         operationType: "insert",
-        "fullDocument.type": "perennial",
       },
     })) {
       // The change event will always represent a newly inserted comment
       const { documentKey, fullDocument } = change;
-      console.log(`new document: ${documentKey}`, fullDocument);
+      console.debug(`new document: ${documentKey}`, fullDocument);
+      new_comments.push(fullDocument)
     }
 }
 
@@ -78,22 +88,64 @@ async function get_first_and_last(collection) {
   }]);
 }
 
-async function main(new_comments) {
+async function init(model) {
     
     let user = await mongo_login() 
+    model.name = user.id
     const mongodb = mongo.currentUser.mongoClient("mongodb-atlas");
-    const comments = mongodb.db("sample_mflix").collection("comments");
-    console.log("Total comments:", await comments.count())
+    model.comments_collection = mongodb.db("sample_mflix").collection("comments");
+    console.log("Total comments:", await model.comments_collection.count())
 
-    const fl = await get_first_and_last(comments)
-    console.log("fl: ", fl)
+    const fl = await get_first_and_last(model.comments_collection)
+    console.debug("fl: ", fl)
     const last = fl[0].last
-    console.log("Push: ", last)
-    new_comments.push(last)
+    console.debug("Push: ", last)
+    model.new_comments.push(last)
 
-    console.log("New comments: ", new_comments)
+    console.debug("New comments: ", model.new_comments)
 
-    comments_append_loop(comments, new_comments)
+    comments_append_loop(model.comments_collection, model.new_comments)
+
+    model.ready = true
+}
+
+function pimp_message(model) {
+    if (!model.message.length) {
+      model.message = "Hello everyone, this is an auto-gen message from " + 
+                      model.name +
+                      " who posted the last one at least " +
+                      model.counter +
+                      "s ago (if ever). Cheers!"
+    }
+}
+
+async function insert(model) {
+    if (!model.ready) {
+      return
+    }
+
+    model.ready = false
+
+    pimp_message(model)
+
+    let document_ = {
+        name: model.name,
+        email: model.name + '@gc_ps.de',
+        movie_id: null,
+        text: model.message,
+        date: new Date(),   
+      }
+    model.message = ""
+    model.counter = 0
+    console.debug("Insert: ", document_)
+
+    result = await model.comments_collection.insertOne(
+      document_
+    )
+
+    console.debug("Insert result: ", result)
+
+    model.ready = true
 }
 
 const vueStuff = {
@@ -102,21 +154,21 @@ const vueStuff = {
       counter: 0,
       new_comments: [],
       message: "Hi there!",
-      // comment: "this is lame  from Vue"
+      name: "",
+      ready: false,
+      comments_collection: null
     }
   },
   mounted() {
     console.debug("Mounted, set timer...")
     setInterval(() => { this.counter++ }, 1000)
     console.debug("Connect with MongoDB Atlas Realm...")
-    main(this.new_comments)
+    init(this)
   },
   methods: {
     publish() {
-      console.log("SEND: ", this.message)
-      this.message = '<sending>'
-      message = ''
-    }
+      insert(this)
+    },
   }
 }
 
